@@ -24,6 +24,7 @@ var (
 	debug      bool
 	logger     *log.Logger
 	private    bool
+	timeout    time.Duration = 120 * time.Second
 )
 
 func init() {
@@ -34,6 +35,7 @@ func init() {
 	pushCmd.Flags().StringVar(&commitMsg, "commitmsg", "", "Commit message")
 	pushCmd.Flags().BoolVar(&debug, "debug", false, "Enable debug logging")
 	pushCmd.Flags().BoolVar(&private, "private", false, "Create repository as private")
+	pushCmd.Flags().DurationVar(&timeout, "timeout", timeout, "Timeout for operations (default 2m)")
 }
 
 var pushCmd = &cobra.Command{
@@ -49,7 +51,7 @@ Example:
 			autoCommit = true
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
 		// Load configuration
@@ -133,12 +135,30 @@ Example:
 			return fmt.Errorf("failed to commit: %w", err)
 		}
 
-		// Push changes
-		if err := gitOps.Push(ctx, "origin", "main"); err != nil {
-			return fmt.Errorf("failed to push: %w", err)
+		// Push changes with retry
+		maxRetries := 3
+		for i := 0; i < maxRetries; i++ {
+			if i > 0 {
+				logger.Warning("Retrying push (attempt %d/%d)...", i+1, maxRetries)
+				time.Sleep(2 * time.Second) // Wait before retry
+			}
+
+			err := gitOps.Push(ctx, "origin", "main")
+			if err == nil {
+				logger.Success("🚀 Successfully pushed changes to GitHub!")
+				return nil
+			}
+
+			if ctx.Err() != nil {
+				logger.Error("Operation timed out")
+				return fmt.Errorf("operation timed out after %v: %w", timeout, ctx.Err())
+			}
+
+			if i == maxRetries-1 {
+				return fmt.Errorf("failed to push after %d attempts: %w", maxRetries, err)
+			}
 		}
 
-		logger.Success("🚀 Successfully pushed changes to GitHub!")
 		return nil
 	},
 }

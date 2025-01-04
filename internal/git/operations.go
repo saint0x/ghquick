@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/saint/ghquick/internal/log"
 )
@@ -190,12 +191,58 @@ func (o *Operations) Commit(ctx context.Context, message string) error {
 	return nil
 }
 
+func (o *Operations) HasRemoteDiffs(ctx context.Context, remote, branch string) (bool, error) {
+	o.logger.Step("Checking for unpushed changes...")
+
+	// Fetch latest changes
+	if err := o.runCommand(ctx, "git", "fetch", remote, branch); err != nil {
+		o.logger.Error("Failed to fetch remote changes")
+		return false, fmt.Errorf("failed to fetch: %w", err)
+	}
+
+	// Check if we have any commits to push
+	cmd := exec.CommandContext(ctx, "git", "rev-list", "HEAD", fmt.Sprintf("^%s/%s", remote, branch), "--count")
+	cmd.Dir = o.workingDir
+	output, err := cmd.Output()
+	if err != nil {
+		// If branch doesn't exist yet, we definitely have changes to push
+		if strings.Contains(string(output), "unknown revision") {
+			o.logger.Debug("Remote branch doesn't exist yet")
+			return true, nil
+		}
+		o.logger.Error("Failed to check for unpushed commits")
+		return false, fmt.Errorf("failed to check unpushed commits: %w", err)
+	}
+
+	count := strings.TrimSpace(string(output))
+	hasDiffs := count != "0"
+
+	if !hasDiffs {
+		o.logger.Info("Repository is up to date with remote")
+	} else {
+		o.logger.Debug("Found %s unpushed commit(s)", count)
+	}
+
+	return hasDiffs, nil
+}
+
 func (o *Operations) Push(ctx context.Context, remote, branch string) error {
 	if remote == "" {
 		remote = "origin"
 	}
 	if branch == "" {
 		branch = "main"
+	}
+
+	// Check if we have any changes to push
+	hasDiffs, err := o.HasRemoteDiffs(ctx, remote, branch)
+	if err != nil {
+		return err
+	}
+
+	if !hasDiffs {
+		o.logger.Success("Already up to date")
+		return nil
 	}
 
 	o.logger.Step("Pushing to %s/%s...", remote, branch)
