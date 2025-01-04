@@ -95,16 +95,27 @@ func (o *Operations) EnsureGitSetup(ctx context.Context, repoName string) error 
 	cmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
 	cmd.Dir = o.workingDir
 	if err := cmd.Run(); err != nil {
-		// Add remote origin
-		remoteURL := fmt.Sprintf("https://github.com/%s/%s.git", os.Getenv("GITHUB_USERNAME"), repoName)
-		o.logger.Step("Adding remote origin: %s", remoteURL)
+		// Add remote origin with authentication
+		token := os.Getenv("GITHUB_TOKEN")
+		username := os.Getenv("GITHUB_USERNAME")
+		remoteURL := fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", username, token, username, repoName)
+		o.logger.Step("Adding remote origin...")
 		if err := o.runCommand(ctx, "git", "remote", "add", "origin", remoteURL); err != nil {
 			o.logger.Error("Failed to add remote origin")
 			return fmt.Errorf("failed to add remote origin: %w", err)
 		}
 		o.logger.Success("Remote origin added")
 	} else {
-		o.logger.Info("Remote origin already configured")
+		// Update existing remote to use authentication
+		token := os.Getenv("GITHUB_TOKEN")
+		username := os.Getenv("GITHUB_USERNAME")
+		remoteURL := fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", username, token, username, repoName)
+		o.logger.Step("Updating remote origin...")
+		if err := o.runCommand(ctx, "git", "remote", "set-url", "origin", remoteURL); err != nil {
+			o.logger.Error("Failed to update remote origin")
+			return fmt.Errorf("failed to update remote origin: %w", err)
+		}
+		o.logger.Success("Remote origin updated")
 	}
 
 	return nil
