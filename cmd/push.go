@@ -11,6 +11,7 @@ import (
 	"github.com/saint/ghquick/internal/cache"
 	"github.com/saint/ghquick/internal/config"
 	"github.com/saint/ghquick/internal/git"
+	"github.com/saint/ghquick/internal/github"
 	"github.com/saint/ghquick/internal/log"
 	"github.com/spf13/cobra"
 )
@@ -22,6 +23,7 @@ var (
 	repoCache  *cache.RepoCache
 	debug      bool
 	logger     *log.Logger
+	private    bool
 )
 
 func init() {
@@ -31,6 +33,7 @@ func init() {
 	pushCmd.Flags().StringVar(&repoName, "name", "", "Repository name (defaults to current directory name)")
 	pushCmd.Flags().StringVar(&commitMsg, "commitmsg", "", "Commit message")
 	pushCmd.Flags().BoolVar(&debug, "debug", false, "Enable debug logging")
+	pushCmd.Flags().BoolVar(&private, "private", false, "Create repository as private")
 }
 
 var pushCmd = &cobra.Command{
@@ -73,7 +76,13 @@ Example:
 
 		// Initialize services
 		gitOps := git.NewOperations(wd, debug)
+		ghClient := github.NewClient(cfg.GitHubToken, debug)
 		commitGen := ai.NewCommitMessageGenerator(cfg.OpenAIKey)
+
+		// Ensure GitHub repository exists
+		if err := ghClient.EnsureRepositoryExists(ctx, repoName, private); err != nil {
+			return fmt.Errorf("failed to ensure repository exists: %w", err)
+		}
 
 		// Ensure git is set up
 		if err := gitOps.EnsureGitSetup(ctx, repoName); err != nil {
