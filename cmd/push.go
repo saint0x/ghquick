@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/saint/ghquick/internal/ai"
-	"github.com/saint/ghquick/internal/cache"
-	"github.com/saint/ghquick/internal/config"
-	"github.com/saint/ghquick/internal/git"
-	"github.com/saint/ghquick/internal/github"
-	"github.com/saint/ghquick/internal/log"
+	"github.com/saint0x/ghquick-cli/internal/ai"
+	"github.com/saint0x/ghquick-cli/internal/cache"
+	"github.com/saint0x/ghquick-cli/internal/config"
+	"github.com/saint0x/ghquick-cli/internal/git"
+	"github.com/saint0x/ghquick-cli/internal/github"
+	"github.com/saint0x/ghquick-cli/internal/log"
 	"github.com/spf13/cobra"
 )
 
@@ -41,15 +41,15 @@ func init() {
 var pushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push changes to GitHub",
-	Long: `Push changes to GitHub with optional AI-powered commit messages.
+	Long: `Push changes to GitHub with AI-powered commit messages by default.
 Example: 
-  ghquick push start        # AI-powered push with automatic commit message
-  ghquick push --name my-repo --commitmsg "feature: new stuff"`,
+  ghquick push                     # AI-powered commit message
+  ghquick push --commitmsg "fix"   # Custom commit message`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		logger = log.New(debug)
-		if len(args) > 0 && args[0] == "start" {
-			autoCommit = true
-		}
+
+		// Use AI by default unless commit message is provided
+		autoCommit = commitMsg == ""
 
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()

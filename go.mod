@@ -1,6 +1,6 @@
-module github.com/saint/ghquick
+module github.com/saint0x/ghquick-cli
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/google/go-github/v57 v57.0.0

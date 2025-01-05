@@ -4,13 +4,9 @@ A lightning-fast CLI tool for GitHub operations with AI-powered automation.
 
 ## Features
 
-- 🤖 AI-powered commit message generation
-- ⚡ Fast parallel operations
-- 🔄 Automatic repository creation and setup
-- 🔒 Secure authentication handling
-- 🔍 Smart diff detection
-- 🔁 Automatic retry mechanism
-- 📝 Beautiful logging with progress indicators
+- 🤖 AI-powered commit messages (1-3 words)
+- 🔄 Automatic branch creation and PR workflow
+- 📝 Interactive PR merging
 
 ## Installation
 
@@ -25,79 +21,57 @@ cd ghquick
 
 ## Configuration
 
-Set up the following environment variables in your shell configuration (e.g., ~/.zshrc):
+Set up your environment variables:
 
 ```bash
-export GITHUB_TOKEN="your_github_token"
-export GITHUB_USERNAME="your_github_username"
-export OPENAI_API_KEY="your_openai_api_key"
+export GITHUB_TOKEN="your_token"
+export GITHUB_USERNAME="your_username"
+export OPENAI_API_KEY="your_key"  # Required for AI features
 ```
 
 ## Usage
 
-### Quick Push with AI-Generated Commit Message
+### Push Changes
 
 ```bash
-ghquick push start
+# Push with AI-generated commit message (default)
+ghquick push
+
+# Push with manual commit message
+ghquick push --commitmsg "fix bug"
 ```
 
-### Push with Custom Commit Message
+### Create Pull Request
+Creates a new branch automatically and opens a PR:
 
 ```bash
-ghquick push --commitmsg "your commit message"
+# Create PR with AI-generated title (default)
+ghquick pr create
+
+# Create PR with custom title
+ghquick pr create --title "fix bug"
+
+# Create PR against different base branch
+ghquick pr create --base develop
 ```
 
-### Push to Specific Repository
+### Merge Pull Request
 
 ```bash
-ghquick push --name repo-name --commitmsg "your commit message"
+# Interactive PR selection (default)
+ghquick pr merge
+
+# Merge specific PR
+ghquick pr merge --number 123
 ```
 
-### Create Private Repository
+### Shell Completion
+
+For enhanced CLI experience, `ghquick` supports shell completion in bash/zsh:
 
 ```bash
-ghquick push --name repo-name --private --commitmsg "initial commit"
+ghquick completion [bash|zsh] > /path/to/completion/script
 ```
-
-### Debug Mode
-
-```bash
-ghquick push start --debug
-```
-
-### Custom Timeout
-
-```bash
-ghquick push start --timeout 5m
-```
-
-## Features in Detail
-
-### AI-Powered Commit Messages
-- Uses GPT-4 to analyze your changes
-- Generates conventional commit messages
-- Understands code context
-
-### Smart Git Operations
-- Automatic repository initialization
-- Secure credential handling
-- Detects and cleans stale locks
-- Checks for unpushed changes
-- Retries on failure
-
-### Performance Features
-- Parallel operations where possible
-- Efficient caching
-- Smart timeouts
-- Optimized for speed
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
 
 ## License
 

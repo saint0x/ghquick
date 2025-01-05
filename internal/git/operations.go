@@ -7,8 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
-	"github.com/saint/ghquick/internal/log"
+	"github.com/saint0x/ghquick-cli/internal/log"
 )
 
 type Operations struct {
@@ -42,9 +43,22 @@ func (o *Operations) cleanupLocks() error {
 	return nil
 }
 
+func (o *Operations) isGitRepo() error {
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd.Dir = o.workingDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("not a git repository - please run this command from within a git repository")
+	}
+	return nil
+}
+
 func (o *Operations) runCommand(ctx context.Context, name string, args ...string) error {
-	// Clean up any stale locks before running git commands
+	// Check if we're in a git repo for git commands
 	if name == "git" {
+		if err := o.isGitRepo(); err != nil {
+			return err
+		}
+		// Clean up any stale locks before running git commands
 		if err := o.cleanupLocks(); err != nil {
 			return err
 		}
@@ -234,22 +248,90 @@ func (o *Operations) Push(ctx context.Context, remote, branch string) error {
 		branch = "main"
 	}
 
-	// Check if we have any changes to push
-	hasDiffs, err := o.HasRemoteDiffs(ctx, remote, branch)
-	if err != nil {
-		return err
-	}
-
-	if !hasDiffs {
-		o.logger.Success("Already up to date")
-		return nil
-	}
-
+	// For first push, just push directly
 	o.logger.Step("Pushing to %s/%s...", remote, branch)
 	if err := o.runCommand(ctx, "git", "push", "-u", remote, branch); err != nil {
-		o.logger.Error("Failed to push changes")
-		return fmt.Errorf("failed to push: %w", err)
+		// If push fails, try to fetch and check for changes
+		hasDiffs, err := o.HasRemoteDiffs(ctx, remote, branch)
+		if err != nil {
+			o.logger.Error("Failed to check remote changes")
+			return fmt.Errorf("failed to check remote: %w", err)
+		}
+
+		if !hasDiffs {
+			o.logger.Success("Already up to date")
+			return nil
+		}
+
+		// Retry push with force if needed
+		o.logger.Step("Retrying push with force...")
+		if err := o.runCommand(ctx, "git", "push", "-u", "-f", remote, branch); err != nil {
+			o.logger.Error("Failed to push changes")
+			return fmt.Errorf("failed to push: %w", err)
+		}
 	}
+
 	o.logger.Success("Changes pushed successfully")
+	return nil
+}
+
+func (o *Operations) GetCurrentBranch(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = o.workingDir
+	output, err := cmd.Output()
+	if err != nil {
+		o.logger.Error("Failed to get current branch")
+		return "", fmt.Errorf("failed to get current branch: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func (o *Operations) CreateAndSwitchBranch(ctx context.Context, baseBranch string) (string, error) {
+	// First check if we're in a git repo
+	if err := o.isGitRepo(); err != nil {
+		return "", err
+	}
+
+	// Generate branch name with timestamp
+	branchName := fmt.Sprintf("update-%d", time.Now().Unix())
+
+	// Fetch latest changes from base branch
+	o.logger.Step("Fetching latest changes...")
+	if err := o.runCommand(ctx, "git", "fetch", "origin", baseBranch); err != nil {
+		o.logger.Error("Failed to fetch changes")
+		return "", fmt.Errorf("failed to fetch changes: %w", err)
+	}
+
+	// Create new branch from latest base
+	o.logger.Step("Creating new branch: %s", branchName)
+	if err := o.runCommand(ctx, "git", "checkout", "-b", branchName, fmt.Sprintf("origin/%s", baseBranch)); err != nil {
+		o.logger.Error("Failed to create branch")
+		return "", fmt.Errorf("failed to create branch: %w", err)
+	}
+	o.logger.Success("Created and switched to new branch")
+
+	return branchName, nil
+}
+
+func FetchLatestChanges() error {
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("not in a git repository - please run this command from within a git repository")
+	}
+
+	cmd = exec.Command("git", "fetch", "origin")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to fetch changes: %v", err)
+	}
+	return nil
+}
+
+// IsGitRepo checks if the current directory is a git repository
+func (o *Operations) IsGitRepo(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--git-dir")
+	cmd.Dir = o.workingDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("not a git repository - please run this command from within a git repository")
+	}
 	return nil
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/saint/ghquick/cmd"
+	"github.com/saint0x/ghquick-cli/cmd"
 )
 
 func main() {
